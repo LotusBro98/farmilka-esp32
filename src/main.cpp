@@ -17,6 +17,7 @@ void handleMouseClick();
 void handleMouseWheel();
 void handleKeyType();
 void handleKeyCombo();
+void handleCombo();
 
 void setup() {
   Serial.begin(115200);
@@ -48,6 +49,7 @@ void setup() {
   server.on("/mouse/wheel", HTTP_GET, handleMouseWheel);
   server.on("/key/type", HTTP_POST, handleKeyType);
   server.on("/key/combo", HTTP_GET, handleKeyCombo);
+  server.on("/combo", HTTP_GET, handleCombo);
 
   server.onNotFound([]() {
     server.send(404, "text/plain", "Not found");
@@ -191,3 +193,62 @@ void handleKeyCombo() {
   Keyboard.releaseAll();
   server.send(200, "text/plain", "OK");
 }
+
+void handleCombo() {
+  if (!Keyboard.isConnected()) {
+    server.send(503, "text/plain", "BLE not connected");
+    return;
+  }
+
+  if (!server.hasArg("mods") || !server.hasArg("keys") || !server.hasArg("mouse")) {
+    server.send(400, "text/plain", "mods, keys, mouse required");
+    return;
+  }
+
+  uint8_t mods  = (uint8_t)server.arg("mods").toInt();
+  String keysStr = server.arg("keys");
+  uint8_t mouseMask = (uint8_t)server.arg("mouse").toInt();
+
+  // --- Модификаторы ---
+  if (mods & 0x01) Keyboard.press(KEY_LEFT_CTRL);
+  if (mods & 0x02) Keyboard.press(KEY_LEFT_SHIFT);
+  if (mods & 0x04) Keyboard.press(KEY_LEFT_ALT);
+  if (mods & 0x08) Keyboard.press(KEY_LEFT_GUI);
+  if (mods & 0x10) Keyboard.press(KEY_RIGHT_CTRL);
+  if (mods & 0x20) Keyboard.press(KEY_RIGHT_SHIFT);
+  if (mods & 0x40) Keyboard.press(KEY_RIGHT_ALT);
+  if (mods & 0x80) Keyboard.press(KEY_RIGHT_GUI);
+
+  // --- Клавиши ---
+  uint8_t keys[6];
+  uint8_t count = 0;
+  int start = 0;
+  while (start < (int)keysStr.length() && count < 6) {
+    int comma = keysStr.indexOf(',', start);
+    if (comma < 0) comma = keysStr.length();
+    String sub = keysStr.substring(start, comma);
+    sub.trim();
+    if (sub.length() > 0)
+      keys[count++] = sub[0];
+    start = comma + 1;
+  }
+  for (uint8_t i = 0; i < count; i++) {
+    Serial.println(keysStr);
+    Keyboard.press(keys[i]);
+  }
+
+  // --- Кнопки мыши ---
+  if (mouseMask & 0x01) Mouse.press(MOUSE_LEFT);
+  if (mouseMask & 0x02) Mouse.press(MOUSE_RIGHT);
+  if (mouseMask & 0x04) Mouse.press(MOUSE_MIDDLE);
+
+  delay(50);  // даём хосту увидеть нажатие
+
+  Keyboard.releaseAll();
+  Mouse.release(MOUSE_LEFT);
+  Mouse.release(MOUSE_RIGHT);
+  Mouse.release(MOUSE_MIDDLE);
+
+  server.send(200, "text/plain", "OK");
+}
+
