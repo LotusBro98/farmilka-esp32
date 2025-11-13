@@ -208,6 +208,8 @@ void handleCombo() {
   uint8_t mods  = (uint8_t)server.arg("mods").toInt();
   String keysStr = server.arg("keys");
   uint8_t mouseMask = (uint8_t)server.arg("mouse").toInt();
+  int32_t duration_ms = (int32_t)server.arg("duration_ms").toInt();
+  bool release = (bool)server.arg("release").toInt();
 
   // --- Модификаторы ---
   if (mods & 0x01) Keyboard.press(KEY_LEFT_CTRL);
@@ -242,12 +244,14 @@ void handleCombo() {
   if (mouseMask & 0x02) Mouse.press(MOUSE_RIGHT);
   if (mouseMask & 0x04) Mouse.press(MOUSE_MIDDLE);
 
-  delay(50);  // даём хосту увидеть нажатие
+  delay(duration_ms);  // даём хосту увидеть нажатие
 
-  Keyboard.releaseAll();
-  Mouse.release(MOUSE_LEFT);
-  Mouse.release(MOUSE_RIGHT);
-  Mouse.release(MOUSE_MIDDLE);
+  if (release) {
+    Keyboard.releaseAll();
+    Mouse.release(MOUSE_LEFT);
+    Mouse.release(MOUSE_RIGHT);
+    Mouse.release(MOUSE_MIDDLE);
+  }
 
   server.send(200, "text/plain", "OK");
 }
