@@ -220,7 +220,7 @@ void handleCommand(const String &line) {
       String sub = skeys.substring(start, comma);
       sub.trim();
       if (sub.length() > 0)
-        keys[count++] = (uint8_t)sub.toInt();
+        keys[count++] = (uint8_t)sub[0];
       start = comma + 1;
     }
     for (uint8_t i = 0; i < count; i++) {
