@@ -1,7 +1,14 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
-#include <BleCombo.h>
+
+// ===== USB HID =====
+#include "USB.h"
+#include "USBHIDKeyboard.h"
+#include "USBHIDMouse.h"
+
+USBHIDKeyboard Keyboard;
+USBHIDMouse    Mouse;
 
 // ---------- WIFI НАСТРОЙКИ ----------
 const char* WIFI_SSID = "MTS_GPON_09AC";
@@ -25,10 +32,11 @@ void setup() {
   Serial.println();
   Serial.println("BOOT");
 
-  // BLE HID
+  // ===== USB HID =====
+  USB.begin();         // инициализация USB-девайса (клавиатура+мышь+CDC в зависимости от настроек платы)
   Keyboard.begin();
   Mouse.begin();
-  Serial.println("BLE HID started");
+  Serial.println("USB HID started");
 
   // WiFi STA
   WiFi.mode(WIFI_STA);
@@ -61,17 +69,7 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  // Ничего больше; BLE HID живёт, пока подключен по BT
-}
-
-// ---------- Вспомогательное ----------
-
-bool ensureBleConnected() {
-  if (!Keyboard.isConnected()) {
-    server.send(503, "text/plain", "BLE not connected");
-    return false;
-  }
-  return true;
+  // USB HID работает сам, пока плата подключена по USB к хосту
 }
 
 // ---------- Handlers ----------
@@ -81,8 +79,7 @@ void handlePing() {
 }
 
 void handleMouseMove() {
-  if (!ensureBleConnected()) return;
-
+  // для USB HID считаем, что если устройство воткнуто - оно "подключено"
   if (!server.hasArg("dx") || !server.hasArg("dy")) {
     server.send(400, "text/plain", "dx, dy required");
     return;
@@ -101,8 +98,6 @@ void handleMouseMove() {
 }
 
 void handleMouseClick() {
-  if (!ensureBleConnected()) return;
-
   if (!server.hasArg("buttons")) {
     server.send(400, "text/plain", "buttons required");
     return;
@@ -118,8 +113,6 @@ void handleMouseClick() {
 }
 
 void handleMouseWheel() {
-  if (!ensureBleConnected()) return;
-
   if (!server.hasArg("v")) {
     server.send(400, "text/plain", "v required");
     return;
@@ -134,8 +127,6 @@ void handleMouseWheel() {
 }
 
 void handleKeyType() {
-  if (!ensureBleConnected()) return;
-
   if (!server.hasArg("text")) {
     server.send(400, "text/plain", "text required");
     return;
@@ -150,8 +141,6 @@ void handleKeyType() {
 }
 
 void handleKeyCombo() {
-  if (!ensureBleConnected()) return;
-
   if (!server.hasArg("mods") || !server.hasArg("keys")) {
     server.send(400, "text/plain", "mods and keys required");
     return;
@@ -195,11 +184,6 @@ void handleKeyCombo() {
 }
 
 void handleCombo() {
-  if (!Keyboard.isConnected()) {
-    server.send(503, "text/plain", "BLE not connected");
-    return;
-  }
-
   if (!server.hasArg("mods") || !server.hasArg("keys") || !server.hasArg("mouse")) {
     server.send(400, "text/plain", "mods, keys, mouse required");
     return;
@@ -231,11 +215,10 @@ void handleCombo() {
     String sub = keysStr.substring(start, comma);
     sub.trim();
     if (sub.length() > 0)
-      keys[count++] = sub[0];
+      keys[count++] = (uint8_t)sub.toInt();  // или sub[0], как у тебя, если нужен ASCII
     start = comma + 1;
   }
   for (uint8_t i = 0; i < count; i++) {
-    Serial.println(keysStr);
     Keyboard.press(keys[i]);
   }
 
